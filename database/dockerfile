@@ -1,0 +1,11 @@
+FROM python:3.11.4
+
+WORKDIR /database
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY vectorize_and_store.py .
+COPY documents .
+
+CMD ["python", "vectorize_and_store.py"]
