@@ -21,12 +21,15 @@ services:
       - db
     env_file:
       - .env
+    volumes:
+      - ./database/init.json:/database/init.json
     environment:
       POSTGRES_DB: vector_database
       POSTGRES_USER: user
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
+      EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME}
 
   backend:
     build:
@@ -38,10 +41,12 @@ services:
     env_file:
       - .env
     environment:
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      LLM_API_KEY: ${LLM_API_KEY}
       POSTGRES_DB: vector_database
       POSTGRES_USER: user
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME}
+      LLM_NAME: ${LLM_NAME}
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
     ports:

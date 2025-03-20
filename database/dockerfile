@@ -6,6 +6,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY vectorize_and_store.py .
+COPY init.json .
 COPY documents .
 
 CMD ["python", "vectorize_and_store.py"]

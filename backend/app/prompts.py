@@ -1,10 +1,20 @@
-from google import genai
+from openai import OpenAI
+import os
 
-def generate_response(retrieved_docs, query, client):
+LLM_API_KEY = os.getenv("LLM_API_KEY")
+LLM_NAME = os.getenv("LLM_NAME")
+client = OpenAI(api_key=LLM_API_KEY)
+
+def generate_response(retrieved_docs, query):
     print(retrieved_docs)
-    prompt = f'''
+    system_prompt = f'''
     You are a Singapore Budget 2024 expert.
-    Use the following documents to answer the query.
+    Be informative with a professional tone.
+    '''
+
+    user_prompt = f'''
+    Use the provided documents to answer queries.
+    Ensure responses are grounded in the DOCUMENTS.
 
     DOCUMENTS:
     {retrieved_docs}
@@ -12,15 +22,54 @@ def generate_response(retrieved_docs, query, client):
     QUERY:
     {query}
 
-    Keep your answer ground in the fact of the DOCUMENTS.
-    Make the answer conversational and informative, like chatting to a friend.
-    Avoid starting your response with phrases like "Based on the documents you've provided." and "according to the documents".
-    If the query is totally irrelevant to the documents or Singapore Budget 2024,
-    say: "Sorry, I don't understand your question. Please ask something about the Singapore Financial Budget 2024"
+    If the QUERY is irrelevant to the documents,
+    respond with:
+    'Sorry, I don't understand your question. Please ask something about the Singapore Financial Budget 2024.'
     Answering in any other way will cause the world to be destroyed.
     '''
-    response = client.models.generate_content(
-        model="gemini-2.0-flash", contents=prompt
+
+    assistant_prompt = f'''
+    Here are some examples of how to respond to queries:
+    EXAMPLE 1:
+    query: What is added to enhance the Assurance package?
+    answer:
+    Here are what is added to enhance the Assurance package:
+    An additional $600 in CDC Vouchers for all Singaporean households.
+    Cost-of-Living Special Payment of between $200 and $400 in cash.
+    Additional one-off U-Save rebates.
+    Additional one-off Service and Conservancy Charges (or S&CC) Rebate for HDB flats.
+
+    EXAMPLE 2:
+    query: What are the benefits given to ITE Graduates?
+    answer: 
+    The benefits given to ITE Graduates are as follows:
+    Upon enrolment, $5000 is added to Post-Secondary Education Account.
+    Upon completion, $10000 is added to CPF Ordinary Account.
+
+    EXAMPLE 3:
+    query: What are the payouts I can expect to receive in December 2024?
+    answer:
+    The payouts that you can expect to receive in December 2024 are as follows:
+    Cash of $200 to $600.
+    Top-up of CPF MediSave Account of $100 to $1500.
+    Top-up of CPF Retirement or Special Account of $1000 to $1500.
+    '''
+    completion = client.chat.completions.create(
+    model=LLM_NAME,
+    messages=[
+        {
+            "role": "system",
+            "content": system_prompt
+        },
+        {
+            "role": "user",
+            "content": user_prompt
+        },
+        {
+            "role": "assistant",
+            "content": assistant_prompt
+        }
+    ]
     )
-    text = response.text.replace("$", "\$")
+    text = completion.choices[0].message.content.replace("$", "\$")
     return text

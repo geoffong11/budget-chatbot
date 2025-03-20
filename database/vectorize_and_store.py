@@ -2,10 +2,12 @@ import pdfplumber
 from sentence_transformers import SentenceTransformer
 import psycopg2
 import psycopg2.extras
+import json
 import re
 import os
 
 DATABASE_SECRET_KEY = os.getenv("POSTGRES_PASSWORD")
+EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME")
 
 DB_CONFIG = {
     "dbname": "vector_database",
@@ -15,11 +17,21 @@ DB_CONFIG = {
     "port": 5432
 }
 
-def naive_chunk_text(text, chunk_size=512):
+def naive_chunk_text(text, chunk_size=350):
     """Splits text into chunks of fixed size."""
     return [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
 
-def get_chunk_sections():
+def chunk_text_with_overlap(text, chunk_size=350, overlap=50):
+    chunks = []
+    # Iterate with overlap
+    for i in range(0, len(text), chunk_size - overlap):
+        chunk = text[i : i + chunk_size]
+        chunks.append(chunk)
+
+    return chunks
+
+# Get chunk sections from the 
+def get_chunk_sections(chunk_funct):
     full_text = ""
     page_num = 0
     chunks = []
@@ -35,31 +47,34 @@ def get_chunk_sections():
     full_text = re.sub(r'\n[A-Z]', "", full_text)
     section_list = re.split(r'(?=\n\d{1,3}\.\s)', full_text)[1:]
     for section in section_list:
-        chunks.extend(naive_chunk_text(section))
+        chunks.extend(chunk_funct(section))
+
     # budget booklet chunking
     with pdfplumber.open('./fy2024_budget_booklet_english.pdf') as pdf:
         for page in pdf.pages[5:]:
             text = page.extract_text()
             if text:
-                chunks.extend(naive_chunk_text(text))
+                chunks.extend(chunk_funct(text))
     # annex chunking
     for annex in os.listdir("annexes"):
+        full_text = ""
         with pdfplumber.open(f"./annexes/{annex}") as pdf:
             for page in pdf.pages:
                 text = page.extract_text()
                 split_text = text.split("\n")[:-2]
                 text = "\n".join(split_text)
-                if text:
-                    chunks.extend(naive_chunk_text(text))
+                full_text += "\n" + text
+        if full_text:
+            chunks.extend(chunk_funct(full_text))
     return chunks
 
-
-def get_embedding(text, model_name="all-mpnet-base-v2"):
-    model = SentenceTransformer(model_name)
+def get_embedding(text):
+    model = SentenceTransformer(EMBEDDING_MODEL_NAME)
     embeddings = model.encode(text)
     return embeddings
 
 def store_embeddings(docs):
+    """Ensure all docs exist in init.sql and then load them into the database."""
     conn = psycopg2.connect(**DB_CONFIG)
     cursor = conn.cursor()
 
@@ -71,43 +86,50 @@ def store_embeddings(docs):
         CREATE TABLE IF NOT EXISTS document_embeddings (
             id SERIAL PRIMARY KEY,
             document TEXT UNIQUE,  -- Prevent duplicate documents
-            embedding VECTOR(768)
+            embedding VECTOR(768),
+            tsvector_data TSVECTOR
         )
     """)
 
-    # Find documents that are already embedded
+    # Load the json file and check if any embeddings is saved
+    embedding_dict = {}
+    if os.path.getsize("init.json") > 0:
+        with open("init.json", "r") as f:
+            embedding_dict = json.load(f)
+    for doc in docs:
+        if doc in embedding_dict:
+            continue
+        embedding_dict[doc] = get_embedding(doc).tolist()
+    with open("init.json", "w") as f:
+        json.dump(embedding_dict, f)
+    
+    # Step 2: Ensure all stored embeddings are inside the database
     cursor.execute("SELECT document FROM document_embeddings")
-    stored_docs = {row[0] for row in cursor.fetchall()}  # Convert to set for fast lookup
+    stored_db_docs = {row[0] for row in cursor.fetchall()}
 
-    # Filter out docs that are already stored
-    new_docs = [doc for doc in docs if doc not in stored_docs]
+    missing_from_db = [(doc, embedding_dict[doc]) for doc in embedding_dict.keys() if doc not in stored_db_docs]
 
-    if not new_docs:
-        print("All documents are already embedded. Skipping embedding computation.")
-    else:
-        print(f"Embedding {len(new_docs)} new documents...")
+    # Get embeddings from embedding dict for new documents
+    data = [(doc, embeddings, f"to_tsvector('english', %s)") for doc, embeddings in missing_from_db]
 
-        # Compute embeddings for new documents
-        data = [(doc, get_embedding(doc)) for doc in new_docs]
+    # Insert new embeddings
+    psycopg2.extras.execute_values(
+        cursor, 
+        """
+        INSERT INTO document_embeddings (document, embedding, tsvector_data)
+        VALUES %s
+        """,
+        [(d[0], d[1], d[2]) for d in data]
+    )
 
-        # Insert new embeddings
-        psycopg2.extras.execute_values(
-            cursor, 
-            """
-            INSERT INTO document_embeddings (document, embedding)
-            VALUES %s
-            """,
-            [(d[0], d[1].tolist()) for d in data]
-        )
-
-        conn.commit()
-        print("New embeddings stored successfully.")
+    conn.commit()
+    print("New embeddings stored successfully.")
 
     cursor.close()
     conn.close()
 
 def main():
-    chunk_list = get_chunk_sections()
+    chunk_list = get_chunk_sections(chunk_text_with_overlap)
     store_embeddings(chunk_list)
 
 if __name__ == "__main__":

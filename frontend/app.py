@@ -26,7 +26,12 @@ if "messages" not in st.session_state:
 
 # Display previous messages
 for message in st.session_state.messages:
-    st.write(message)
+    if message.startswith("You:"):
+        # Display user message with a border
+        st.markdown(f'<div style="border: 2px solid #4CAF50; padding: 10px; margin: 5px; border-radius: 5px;">{message}</div>', unsafe_allow_html=True)
+    else:
+        # Display bot's response with a border
+        st.markdown(f'<div style="border: 2px solid #2196F3; padding: 10px; margin: 5px; border-radius: 5px;">{message}</div>', unsafe_allow_html=True)
 
 # Input form to prevent rerun issues
 with st.form(key="chat_form"):
@@ -37,6 +42,6 @@ with st.form(key="chat_form"):
 if submitted and user_input:
     response = get_bot_response(user_input)
     st.session_state.messages.append(f"You: {user_input}")
-    st.session_state.messages.append(response)
+    st.session_state.messages.append(f"Budget 2024 assistant: {response}")
 
     st.rerun()  # Refresh UI to display new messages
