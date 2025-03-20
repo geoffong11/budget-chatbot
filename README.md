@@ -9,16 +9,16 @@ This project is an AI-powered chatbot utilizing OpenAI's ChatGPT model and a Ret
 Follow these steps to install the chatbot
 ```
 # Clone the repository
-git clone <git link here>
+git clone https://github.com/geoffong11/budget-chatbot.git
 cd budget-chatbot
 ```
 ### Configuration
 
-Update the `.env` file with ChatGPT API key and PostgreSQL database password
+Update the `.env` file with your ChatGPT API key and PostgreSQL database password
 
 ### Running the Chatbot
 
-Follow these steps to run the chatbot
+To run the chatbot, open docker desktop, and run:
 ```
 docker-compose up
 ```
@@ -54,7 +54,7 @@ For both the Budget Statement and Budget Booklet, if a page or segment exceeds t
 I use Hybrid Search for retrieval, which combines Vector Search and BM25 (Best Match 25) Keyword Search, to combine the strengths of both methods. Vector Search captures semantic similarity, making it effective for retrieving contextually relevant documents even when exact terms are not matched. Meanwhile, BM25 excels at retrieving documents based on exact keyword occurrences, ensuring high precision when specific terms are important. 
 
 #### Generation and prompting strategy
-I make use of system, user and assistant prompts.\
-For system prompts, I prompted the LLM to act like a Singapore Budget 2024 expert, and told the LLM to have a professional tone.\
-For user prompts, I include the documents that I retrieved and the query. In order to prevent hallucination, I explicitly told the LLM not to answer if the query is not relevant to the documents. \
-For assistant prompt, I use few-shot prompting as it gives the LLM a template for it to work with. From trial-and-error, I realized that without the template, the LLM will answer the questions in many different ways, which may not be ideal.
+I make use of system, user and assistant prompts.
+- For system prompts, I prompted the LLM to act like a Singapore Budget 2024 expert, and told the LLM to have a professional tone.
+- For user prompts, I include the documents that I retrieved and the query. In order to prevent hallucination, I explicitly told the LLM not to answer if the query is not relevant to the documents.
+- For assistant prompt, I use few-shot prompting as it gives the LLM a template for it to work with. From trial-and-error, I realized that without the template, the LLM will answer the questions in many different ways, which may not be ideal.
