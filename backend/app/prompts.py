@@ -5,6 +5,7 @@ LLM_API_KEY = os.getenv("LLM_API_KEY")
 LLM_NAME = os.getenv("LLM_NAME")
 client = OpenAI(api_key=LLM_API_KEY)
 
+# Uses gpt-4o to generate response, based on the prompts given
 def generate_response(retrieved_docs, query):
     print(retrieved_docs)
     system_prompt = f'''

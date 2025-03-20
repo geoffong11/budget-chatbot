@@ -21,6 +21,7 @@ def naive_chunk_text(text, chunk_size=350):
     """Splits text into chunks of fixed size."""
     return [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
 
+# Chunk size of 350, with an overlap of 50
 def chunk_text_with_overlap(text, chunk_size=350, overlap=50):
     chunks = []
     # Iterate with overlap

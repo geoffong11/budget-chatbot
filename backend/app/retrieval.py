@@ -76,7 +76,6 @@ def find_top_n_documents(query, n_take=20, n_final=20):
 
     final_results = [(item[1]['document'], item[1]['bm25_score'], item[1]['dense_score']) for item in ranked_results[:n_final]]
 
-    # Close connection
     cur.close()
     conn.close()
     print(final_results)
