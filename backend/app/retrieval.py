@@ -22,9 +22,9 @@ def find_top_n_documents(query, n_take=20, n_final=20):
     conn = psycopg2.connect(**DB_CONFIG)
     cur = conn.cursor()
 
-    # Create BM25 index (if not already created)
+    # Create keyword index (if not already created)
     cur.execute("CREATE INDEX IF NOT EXISTS document_embeddings_tsvector_index ON document_embeddings USING GIN (tsvector_data);")
-    # Perform BM25-based search
+    # Perform keyword-based search
     cur.execute("""
         SELECT id, document, ts_rank_cd(tsvector_data, plainto_tsquery('english', %s)) AS rank
         FROM document_embeddings
@@ -33,7 +33,7 @@ def find_top_n_documents(query, n_take=20, n_final=20):
         LIMIT %s;
     """, (query, query, n_take))
     
-    bm25_results = {row[0]: {'document': row[1], 'bm25_score': row[2], 'dense_score': None} for row in cur.fetchall()}
+    keyword_results = {row[0]: {'document': row[1], 'keyword_score': row[2], 'dense_score': None} for row in cur.fetchall()}
 
     # Perform dense vector-based search using cosine similarity
     cur.execute("""
@@ -43,38 +43,38 @@ def find_top_n_documents(query, n_take=20, n_final=20):
         LIMIT %s;
     """, (query_embedding.tolist(), n_take))
     
-    dense_results = {row[0]: {'document': row[1], 'bm25_score': None, 'dense_score': row[2]} for row in cur.fetchall()}
+    dense_results = {row[0]: {'document': row[1], 'keyword_score': None, 'dense_score': row[2]} for row in cur.fetchall()}
 
-    # Merge BM25 and Dense search results
+    # Merge keyword and Dense search results
     for doc_id, data in dense_results.items():
-        if doc_id in bm25_results:
-            bm25_results[doc_id]['dense_score'] = data['dense_score']
+        if doc_id in keyword_results:
+            keyword_results[doc_id]['dense_score'] = data['dense_score']
         else:
-            bm25_results[doc_id] = data
+            keyword_results[doc_id] = data
 
     # Normalize scores
-    bm25_scores = np.array([v['bm25_score'] or 0 for v in bm25_results.values()])
-    dense_scores = np.array([v['dense_score'] or 0 for v in bm25_results.values()])
+    keyword_scores = np.array([v['keyword_score'] or 0 for v in keyword_results.values()])
+    dense_scores = np.array([v['dense_score'] or 0 for v in keyword_results.values()])
 
-    if len(bm25_scores) > 0:
-        bm25_scores = (bm25_scores - np.min(bm25_scores)) / (np.ptp(bm25_scores) + 1e-6)
+    if len(keyword_scores) > 0:
+        keyword_scores = (keyword_scores - np.min(keyword_scores)) / (np.ptp(keyword_scores) + 1e-6)
     if len(dense_scores) > 0:
         dense_scores = (dense_scores - np.min(dense_scores)) / (np.ptp(dense_scores) + 1e-6)
 
-    for i, doc_id in enumerate(bm25_results.keys()):
-        bm25_results[doc_id]['bm25_score'] = bm25_scores[i]
-        bm25_results[doc_id]['dense_score'] = dense_scores[i]
+    for i, doc_id in enumerate(keyword_results.keys()):
+        keyword_results[doc_id]['keyword_score'] = keyword_scores[i]
+        keyword_results[doc_id]['dense_score'] = dense_scores[i]
 
     
     # Weighted ranking
     alpha = 0.7
     ranked_results = sorted(
-        bm25_results.items(),
-        key=lambda x: (1 - alpha) * x[1]['bm25_score'] + alpha * x[1]['dense_score'],
+        keyword_results.items(),
+        key=lambda x: (1 - alpha) * x[1]['keyword_score'] + alpha * x[1]['dense_score'],
         reverse=True
     )
 
-    final_results = [(item[1]['document'], item[1]['bm25_score'], item[1]['dense_score']) for item in ranked_results[:n_final]]
+    final_results = [(item[1]['document'], item[1]['keyword_score'], item[1]['dense_score']) for item in ranked_results[:n_final]]
 
     cur.close()
     conn.close()

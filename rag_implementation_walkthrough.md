@@ -28,7 +28,7 @@ I use different chunking strategies depending on the document type:
 For both the Budget Statement and Budget Booklet, if a page or segment exceeds the maximum sequence length of the sentence transformer (384 tokens), I apply overlapping chunking to ensure no critical information is lost.
 
 #### Retrieval strategy
-I use Hybrid Search for retrieval, which combines Vector Search and BM25 (Best Match 25) Keyword Search, to combine the strengths of both methods. Vector Search captures semantic similarity, making it effective for retrieving contextually relevant documents even when exact terms are not matched. Meanwhile, BM25 excels at retrieving documents based on exact keyword occurrences, ensuring high precision when specific terms are important. `tsvector` and `tsquery` are pgvector's implementation of keyword searches, hence 
+I use Hybrid Search for retrieval, combining Vector Search and Full Keyword Search to leverage the strengths of both methods. Vector Search captures semantic similarity, enabling the retrieval of contextually relevant documents even when exact terms do not match. Meanwhile, Full Keyword Search retrieves documents based on exact keyword occurrences, ensuring precise matches for specific terms. PostgreSQL’s `tsvector` and `tsquery` provide efficient keyword search capabilities, complementing pgvector’s implementation of semantic search.
 
 #### Generation and prompting strategy
 I make use of system, user and assistant prompts.
