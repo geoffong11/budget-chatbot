@@ -1,6 +1,7 @@
 from sentence_transformers import SentenceTransformer
 import psycopg2
 import os
+import re
 import numpy as np
 
 DATABASE_SECRET_KEY = os.getenv("POSTGRES_PASSWORD")
@@ -14,6 +15,10 @@ DB_CONFIG = {
     "port": 5432
 }
 
+# Retrieve the top `n_take` documents from both keyword-based and vector-based searches.
+# Merge the results, ensuring no duplicates, and compute a weighted relevance score for each document.
+# The final relevance score is calculated as a weighted average of keyword score and vector similarity scores.
+# Select the top `n_final` documents based on the computed scores for the final output.
 def find_top_n_documents(query, n_take=20, n_final=20):
     model = SentenceTransformer(EMBEDDING_MODEL_NAME)
     query_embedding = model.encode(query)
@@ -21,17 +26,19 @@ def find_top_n_documents(query, n_take=20, n_final=20):
     # Establish connection to the database
     conn = psycopg2.connect(**DB_CONFIG)
     cur = conn.cursor()
-
+    keyword_query = re.sub(r"[^a-zA-Z\s]", "", query)
+    keyword_query = re.sub(r"\s+", " ", keyword_query)
+    formatted_query = " | ".join(keyword_query.split())
     # Create keyword index (if not already created)
     cur.execute("CREATE INDEX IF NOT EXISTS document_embeddings_tsvector_index ON document_embeddings USING GIN (tsvector_data);")
     # Perform keyword-based search
     cur.execute("""
-        SELECT id, document, ts_rank_cd(tsvector_data, plainto_tsquery('english', %s)) AS rank
-        FROM document_embeddings
-        WHERE tsvector_data @@ plainto_tsquery('english', %s)
+        SELECT id, document, ts_rank_cd(tsvector_data, query, 32 /* rank/(rank+1) */ ) AS rank
+        FROM document_embeddings, to_tsquery('english', %s) query
+        WHERE query @@ tsvector_data
         ORDER BY rank DESC
         LIMIT %s;
-    """, (query, query, n_take))
+    """, (formatted_query, n_take))
     
     keyword_results = {row[0]: {'document': row[1], 'keyword_score': row[2], 'dense_score': None} for row in cur.fetchall()}
 
@@ -78,5 +85,4 @@ def find_top_n_documents(query, n_take=20, n_final=20):
 
     cur.close()
     conn.close()
-    print(final_results)
     return final_results

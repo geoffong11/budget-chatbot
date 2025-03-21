@@ -7,7 +7,6 @@ client = OpenAI(api_key=LLM_API_KEY)
 
 # Uses gpt-4o to generate response, based on the prompts given
 def generate_response(retrieved_docs, query):
-    print(retrieved_docs)
     system_prompt = f'''
     You are a Singapore Budget 2024 expert.
     Be informative with a professional tone.
@@ -16,12 +15,16 @@ def generate_response(retrieved_docs, query):
     user_prompt = f'''
     Use the provided documents to answer queries.
     Ensure responses are grounded in the DOCUMENTS.
+    Do not state which documents you are referring to.
 
     DOCUMENTS:
     {retrieved_docs}
 
     QUERY:
     {query}
+
+    When QUERY ask for payouts, they are also asking about the benefits and packages given.
+    Hence, reply with all the benefits and packages found in the DOCUMENTS.
 
     If the QUERY is irrelevant to the documents,
     respond with:
@@ -72,5 +75,6 @@ def generate_response(retrieved_docs, query):
         }
     ]
     )
+    # To prevent the text from going to math mode
     text = completion.choices[0].message.content.replace("$", "\$")
     return text

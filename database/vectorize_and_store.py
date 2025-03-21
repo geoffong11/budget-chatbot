@@ -31,18 +31,14 @@ def chunk_text_with_overlap(text, chunk_size=350, overlap=50):
 
     return chunks
 
-# Get chunk sections from the 
+# Get chunk sections from the documents
 def get_chunk_sections(chunk_funct):
     full_text = ""
-    page_num = 0
     chunks = []
     # budget statement speech chunking (chunk based on bullet points)
     with pdfplumber.open("./fy2024_budget_statement.pdf") as pdf:
-        for page in pdf.pages:
+        for page in pdf.pages[2:]:
             text = page.extract_text()
-            page_num += 1
-            if page_num <= 2:
-                continue
             text = re.sub(r"\nPage \d{1,2} of 86", "", text)
             full_text += "\n" + text
     full_text = re.sub(r'\n[A-Z]', "", full_text)
@@ -50,12 +46,14 @@ def get_chunk_sections(chunk_funct):
     for section in section_list:
         chunks.extend(chunk_funct(section))
 
+    booklet_text = ""
     # budget booklet chunking
     with pdfplumber.open('./fy2024_budget_booklet_english.pdf') as pdf:
         for page in pdf.pages[5:]:
             text = page.extract_text()
-            if text:
-                chunks.extend(chunk_funct(text))
+            booklet_text += "\n" + text
+    chunks.extend(chunk_funct(booklet_text))
+
     # annex chunking
     for annex in os.listdir("annexes"):
         full_text = ""
@@ -67,6 +65,7 @@ def get_chunk_sections(chunk_funct):
                 full_text += "\n" + text
         if full_text:
             chunks.extend(chunk_funct(full_text))
+            
     return chunks
 
 def get_embedding(text):
@@ -74,8 +73,11 @@ def get_embedding(text):
     embeddings = model.encode(text)
     return embeddings
 
+# Check if the documents are already chunked in the JSON file.
+# If not, chunk them and generate their embeddings.
+# If the documents are chunked, verify whether the database contains the documents and their embeddings. 
+# If any are missing, load them into the database.
 def store_embeddings(docs):
-    """Ensure all docs exist in init.sql and then load them into the database."""
     conn = psycopg2.connect(**DB_CONFIG)
     cursor = conn.cursor()
 
@@ -108,10 +110,7 @@ def store_embeddings(docs):
     cursor.execute("SELECT document FROM document_embeddings")
     stored_db_docs = {row[0] for row in cursor.fetchall()}
 
-    missing_from_db = [(doc, embedding_dict[doc]) for doc in embedding_dict.keys() if doc not in stored_db_docs]
-
-    # Get embeddings from embedding dict for new documents
-    data = [(doc, embeddings, f"to_tsvector('english', %s)") for doc, embeddings in missing_from_db]
+    missing_from_db = [(doc, embedding_dict[doc], doc) for doc in embedding_dict.keys() if doc not in stored_db_docs]
 
     # Insert new embeddings
     psycopg2.extras.execute_values(
@@ -120,7 +119,8 @@ def store_embeddings(docs):
         INSERT INTO document_embeddings (document, embedding, tsvector_data)
         VALUES %s
         """,
-        [(d[0], d[1], d[2]) for d in data]
+        missing_from_db,
+        template="(%s, %s, to_tsvector('english', %s))"
     )
 
     conn.commit()
