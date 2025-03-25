@@ -22,6 +22,6 @@ To run the chatbot, open docker desktop, and run:
 ```
 docker-compose up
 ```
-Add the `build` flag to rebuild  the image, if necessary.\
+If the code has been ran before, run `docker-compose down --volumes`. Then add the `build` flag to `docker-compose up` to rebuild  the image.\
 Go to `localhost:8501` and chat away!
 
