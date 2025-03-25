@@ -3,6 +3,9 @@ services:
   db:
     image: pgvector/pgvector:pg17
     restart: always
+    platform: "linux/amd64"
+    env_file:
+      - .env
     environment:
       POSTGRES_DB: vector_database
       POSTGRES_USER: user
@@ -17,6 +20,7 @@ services:
       context: ./database
       dockerfile: dockerfile
     container_name: database
+    platform: "linux/amd64"
     depends_on:
       - db
     env_file:
@@ -36,6 +40,7 @@ services:
       context: ./backend
       dockerfile: dockerfile
     container_name: backend
+    platform: "linux/amd64"
     depends_on:
       - db
     env_file:
@@ -58,6 +63,7 @@ services:
       context: ./frontend
       dockerfile: dockerfile
     container_name: frontend
+    platform: "linux/amd64"
     env_file:
       - .env
     ports:

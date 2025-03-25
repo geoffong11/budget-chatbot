@@ -14,7 +14,7 @@ cd budget-chatbot
 ```
 ### Configuration
 
-Update the `.env` file with your ChatGPT API key and PostgreSQL database password
+Update the `.env` file with your ChatGPT API key
 
 ### Running the Chatbot
 
